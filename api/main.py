@@ -103,6 +103,18 @@ def health_check():
         "status": "ok",
         "message": "SenSante API is running"
     }
+
+# ===== Route model-info =====
+
+@app.get("/model-info")
+def model_info():
+
+    return {
+        "type_modele": type(model).__name__,
+        "nombre_arbres": model.n_estimators,
+        "classes": list(model.classes_),
+        "nombre_features": model.n_features_in_
+    }
 	
 # ===== Route predict =====
 
