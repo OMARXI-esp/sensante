@@ -1,0 +1,203 @@
+# API FastAPI pour SenSante - Assistant pre-diagnostic medical
+
+from fastapi import FastAPI
+from pydantic import BaseModel, Field
+import joblib
+import numpy as np
+
+# ===== Schemas Pydantic =====
+
+class PatientInput(BaseModel):
+    """Donnees d'entree : les symptomes d'un patient."""
+
+    age: int = Field(..., ge=0, le=120, description="Age en annees")
+    
+    sexe: str = Field(
+        ...,
+        description="Sexe : M ou F"
+    )
+
+    temperature: float = Field(
+        ...,
+        ge=35.0,
+        le=42.0,
+        description="Temperature en Celsius"
+    )
+
+    tension_sys: int = Field(
+        ...,
+        ge=60,
+        le=250,
+        description="Tension systolique"
+    )
+
+    toux: bool = Field(
+        ...,
+        description="Presence de toux"
+    )
+
+    fatigue: bool = Field(
+        ...,
+        description="Presence de fatigue"
+    )
+
+    maux_tete: bool = Field(
+        ...,
+        description="Presence de maux de tete"
+    )
+
+    region: str = Field(
+        ...,
+        description="Region du Senegal"
+    )
+
+
+class DiagnosticOutput(BaseModel):
+    """Donnees de sortie : resultat du diagnostic."""
+
+    diagnostic: str = Field(
+        ...,
+        description="Diagnostic predit"
+    )
+
+    probabilite: float = Field(
+        ...,
+        description="Probabilite du diagnostic"
+    )
+
+    confiance: str = Field(
+        ...,
+        description="Niveau de confiance"
+    )
+
+    message: str = Field(
+        ...,
+        description="Recommendation"
+    )
+	
+# Creer l'application
+app = FastAPI(
+    title="SenSante API",
+    description="Assistant pre-diagnostic medical pour le Senegal",
+    version="0.2.0"
+)
+
+# ===== Charger le modele au demarrage =====
+
+print("Chargement du modele...")
+
+model = joblib.load("models/model.pkl")
+le_sexe = joblib.load("models/encoder_sexe.pkl")
+le_region = joblib.load("models/encoder_region.pkl")
+feature_cols = joblib.load("models/feature_cols.pkl")
+
+print(f"Modele charge : {type(model).__name__}")
+print(f"Classes : {list(model.classes_)}")
+
+# Route de base : verifier que l'API fonctionne
+@app.get("/health")
+def health_check():
+    """Verification de l'etat de l'API."""
+    
+    return {
+        "status": "ok",
+        "message": "SenSante API is running"
+    }
+	
+# ===== Route predict =====
+
+@app.post("/predict", response_model=DiagnosticOutput)
+def predict(patient: PatientInput):
+
+    """
+    Predire un diagnostic a partir des symptomes d'un patient.
+    """
+
+    # ===== Encoder sexe =====
+
+    try:
+        sexe_enc = le_sexe.transform([patient.sexe])[0]
+
+    except ValueError:
+
+        return DiagnosticOutput(
+            diagnostic="erreur",
+            probabilite=0.0,
+            confiance="aucune",
+            message=f"Sexe invalide : {patient.sexe}"
+        )
+
+    # ===== Encoder region =====
+
+    try:
+        region_enc = le_region.transform([patient.region])[0]
+
+    except ValueError:
+
+        return DiagnosticOutput(
+            diagnostic="erreur",
+            probabilite=0.0,
+            confiance="aucune",
+            message=f"Region inconnue : {patient.region}"
+        )
+
+    # ===== Construire les features =====
+
+    features = np.array([[
+        patient.age,
+        sexe_enc,
+        patient.temperature,
+        patient.tension_sys,
+        int(patient.toux),
+        int(patient.fatigue),
+        int(patient.maux_tete),
+        region_enc
+    ]])
+
+    # ===== Prediction =====
+
+    diagnostic = model.predict(features)[0]
+
+    probas = model.predict_proba(features)[0]
+
+    proba_max = float(probas.max())
+
+    # ===== Niveau confiance =====
+
+    if proba_max >= 0.7:
+        confiance = "haute"
+
+    elif proba_max >= 0.4:
+        confiance = "moyenne"
+
+    else:
+        confiance = "faible"
+
+    # ===== Messages =====
+
+    messages = {
+
+        "paludisme": "Suspicion de paludisme. Consultez rapidement.",
+
+        "grippe": "Suspicion de grippe. Repos et hydratation.",
+
+        "typhoide": "Suspicion de typhoide. Consultation necessaire.",
+
+        "sain": "Pas de pathologie detectee."
+    }
+
+    # ===== Retour resultat =====
+
+    return DiagnosticOutput(
+
+        diagnostic=diagnostic,
+
+        probabilite=round(proba_max, 2),
+
+        confiance=confiance,
+
+        message=messages.get(
+            diagnostic,
+            "Consultez un medecin."
+        )
+    )
