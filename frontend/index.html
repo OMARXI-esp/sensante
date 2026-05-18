@@ -31,6 +31,24 @@
         </div>
 
     </header>
+	
+	<!-- Statut API -->
+
+<div id="api-status"
+
+     class="max-w-4xl mx-auto px-4 mt-4">
+
+    <div class="bg-gray-200
+                text-gray-700
+                px-4 py-2
+                rounded-lg
+                text-sm">
+
+        Verification API...
+
+    </div>
+
+</div>
 
     <!-- Contenu principal -->
     <main class="max-w-4xl mx-auto px-4 py-8">
@@ -247,6 +265,17 @@
                    shadow-md">
 
         Diagnostiquer
+
+    </button>
+	
+	<button onclick="resetFormulaire()"
+
+        class="w-full mt-3
+               bg-gray-300 text-gray-700
+               font-bold py-2 rounded-lg
+               hover:bg-gray-400">
+
+    Reinitialiser
 
     </button>
 
@@ -616,6 +645,87 @@ function afficherErreur(msg) {
     `;
 }
 
+    function resetFormulaire() {
+
+    document.getElementById("age").value = "";
+
+    document.getElementById("temperature").value = "";
+
+    document.getElementById("tension_sys").value = "";
+
+    document.getElementById("toux").checked = false;
+
+    document.getElementById("fatigue").checked = false;
+
+    document.getElementById("maux_tete").checked = false;
+
+
+    document.getElementById("result-section").innerHTML = `
+
+        <div class="bg-white rounded-xl
+                    shadow-md p-6
+                    text-center text-gray-400">
+
+            <p class="text-4xl mb-3">
+                🩺
+            </p>
+
+            <p class="font-medium">
+
+                Formulaire reinitialise
+
+            </p>
+
+        </div>
+    `;
+}
+
+    async function verifierAPI() {
+
+    const zone =
+        document.getElementById("api-status");
+
+    try {
+
+        const response =
+            await fetch(API_URL + "/health");
+
+        if (!response.ok) {
+            throw new Error();
+        }
+
+        zone.innerHTML = `
+
+            <div class="bg-green-100
+                        text-green-700
+                        px-4 py-2
+                        rounded-lg
+                        text-sm">
+
+                API connectee
+
+            </div>
+        `;
+    }
+
+    catch {
+
+        zone.innerHTML = `
+
+            <div class="bg-red-100
+                        text-red-700
+                        px-4 py-2
+                        rounded-lg
+                        text-sm">
+
+                API hors ligne
+
+            </div>
+        `;
+    }
+}
+
+verifierAPI();
 
     </script>
 
